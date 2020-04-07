@@ -1,0 +1,88 @@
+#!/usr/bin/env python3
+
+#SoC Verilog Module Composition
+
+import os
+import importlib.util as ip
+import sys
+import hdlparse.verilog_parser as vlog
+
+class soc_comp (object):
+	def __init__ (self, cfg):
+		self.cfg  = cfg
+		self.fobj = None
+		self.subblocks = list ()
+		self.ios = list ()
+		self.wires = list ()
+
+	@staticmethod
+	def dump_module (m):
+		print ('Module "{}":'.format (m.name))
+		print ('  Parameters:')
+		for p in m.generics:
+			print('\t{:40}{:8}{}'.format(p.name, p.mode, p.data_type))
+		print ('  IOs:')
+		for p in m.ports:
+			print('\t{:20}{:8}{}'.format(p.name, p.mode, p.data_type))
+
+	def parse_subblocks (self):
+		for k, v in self.cfg.soc ["subblocks"].items ():
+			fname = v ["filename"]
+			if "libs" in self.cfg.soc:
+				for lib in self.cfg.soc["libs"]:
+					if os.path.isfile (lib + "/" + fname):
+						fname = lib + "/" + fname
+						break
+			modules = self.get_info (fname)
+			for m in modules:
+				soc_comp.dump_module (m)
+
+	def generate (self):
+		self.fobj = open (self.cfg.soc ["filename"], "w")
+		self.add_desc ()
+		self.fobj.write ("module " + self.cfg.soc ["name"] + "\n")
+
+		self.add_params () # #(parameter ...)
+		self.add_ios ()    # ( io signals );
+		self.add_wires ()  # internal signals;
+		self.instantiate () # instantiate sub blocks
+
+		self.fobj.write ("endmodule\n// EOF")
+		self.fobj.close ()
+
+	def add_desc (self):
+		if "desc" in cfg.soc:
+			for line in (cfg.soc["desc"]):
+				self.fobj.write ("// " + line + "\n")
+			self.fobj.write ("\n")
+
+	def add_params (self):
+		pass
+
+	def add_ios (self):
+		pass
+
+	def add_wires (self):
+		pass
+
+	def instantiate (self):
+		pass
+
+	@staticmethod
+	def get_info (filename):
+		#vparser = VerilogParse ()
+		vparser = vlog.VerilogExtractor () 
+		tokens = vparser.extract_objects (filename)
+		return tokens
+
+if __name__ == "__main__":
+	if len (sys.argv) == 2:
+		soc_cfg = ip.spec_from_file_location ('soc_cfg', sys.argv[1])
+		cfg     = ip.module_from_spec (soc_cfg)
+		soc_cfg.loader.exec_module (cfg)
+		soc = soc_comp (cfg)
+		soc.parse_subblocks ()
+		soc.generate ()
+	else:
+		print ("Please speficy Soc config file like below example:")
+		print ("	" + os.path.basename(__file__) + " config_file.py")
